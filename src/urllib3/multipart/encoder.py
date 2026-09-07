@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import os
 import typing
 
 from .. import _collections, fields, filepost
@@ -27,7 +26,11 @@ class Part:
         body: io.BytesIO | io.BufferedReader | FileWrapper | _CustomBytesIO,
     ) -> None:
         self.headers = headers
-        self.body = body
+        self.body = (
+            body
+            if hasattr(body, "len") or hasattr(body, "__len__")
+            else FileWrapper(body)
+        )
         self.headers_unread = True
         self.len = len(self.headers) + total_len(self.body)
         self._body_start = self.body.tell()
@@ -563,17 +566,23 @@ def total_len(
         o = typing.cast(typing.Union[Part, FileWrapper, _CustomBytesIO], o)
         return o.len
 
-    if hasattr(o, "fileno"):
-        try:
-            fileno = o.fileno()
-        except io.UnsupportedOperation:
-            pass
-        else:
-            return os.fstat(fileno).st_size
-
     if isinstance(o, io.BytesIO):
         with o.getbuffer() as buffer:
             return buffer.nbytes
+
+    if hasattr(o, "seek") and hasattr(o, "tell"):
+        # A file descriptor's physical size can differ from the readable
+        # stream's length, for example when reading a compressed file.
+        stream = typing.cast(typing.BinaryIO, o)
+        try:
+            position = stream.tell()
+            try:
+                stream.seek(0, io.SEEK_END)
+                return stream.tell()
+            finally:
+                stream.seek(position)
+        except io.UnsupportedOperation as exc:
+            raise ValueError("Unable to compute size", o) from exc
 
     if hasattr(o, "getvalue"):
         o = typing.cast(typing.Union[io.BytesIO, io.StringIO], o)

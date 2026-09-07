@@ -1,3 +1,5 @@
 Add streaming multipart encoding with bounded file reads, rewind support for
-retries, and multipart response decoding. ``encode_multipart_formdata()`` uses
-the encoder internally while retaining its bytes return value.
+retries, and multipart response decoding. Stream lengths and rewind positions
+follow the logical input stream, including compressed files. Empty parts
+without headers can be decoded. ``encode_multipart_formdata()`` uses the
+encoder internally while retaining its bytes return value.
