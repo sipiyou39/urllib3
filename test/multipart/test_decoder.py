@@ -19,15 +19,20 @@ def test_body_part() -> None:
     assert part.headers.getlist("X-Test") == ["one", "two"]
 
 
-def test_headerless_part() -> None:
-    part = BodyPart(b"\r\ndata\r\nTwo lines")
+@pytest.mark.parametrize(
+    "content,expected_data",
+    [(b"", b""), (b"\r\n", b""), (b"\r\ndata\r\nTwo lines", b"data\r\nTwo lines")],
+)
+def test_headerless_part(content: bytes, expected_data: bytes) -> None:
+    part = BodyPart(content)
     assert not part.headers
-    assert part.data == b"data\r\nTwo lines"
+    assert part.data == expected_data
 
 
-def test_invalid_part() -> None:
+@pytest.mark.parametrize("content", [b"no CRLF CRLF here!\r\n", b"not a header"])
+def test_invalid_part(content: bytes) -> None:
     with pytest.raises(ImproperBodyPartContentError):
-        BodyPart(b"no CRLF CRLF here!\r\n")
+        BodyPart(content)
 
 
 def test_round_trip() -> None:
@@ -104,6 +109,24 @@ def test_empty_multipart() -> None:
         MultipartDecoder(b"--b--\r\n", content_type="multipart/mixed; boundary=b").parts
         == ()
     )
+
+
+@pytest.mark.parametrize(
+    "content,expected_data",
+    [
+        (b"--b\r\n\r\n--b--\r\n", [b""]),
+        (b"--b\r\n\r\n\r\n--b--\r\n", [b""]),
+        (b"--b\r\n\r\n--b\r\n\r\n--b--\r\n", [b"", b""]),
+        (
+            b"--b\r\n\r\n--b\r\n\r\ndata\r\n--b\r\n\r\n--b--\r\n",
+            [b"", b"data", b""],
+        ),
+    ],
+)
+def test_empty_headerless_parts(content: bytes, expected_data: list[bytes]) -> None:
+    decoder = MultipartDecoder(content, content_type="multipart/mixed; boundary=b")
+    assert [part.data for part in decoder.parts] == expected_data
+    assert all(not part.headers for part in decoder.parts)
 
 
 def test_missing_closing_boundary() -> None:

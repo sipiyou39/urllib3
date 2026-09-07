@@ -408,6 +408,9 @@ inputs open and unchanged until the request, including any retries, completes.
 ``body.seek(0)`` rewinds every part to its initial position, and ``body.tell()``
 reports the number of encoded bytes consumed. Only a complete rewind is
 supported; an input that cannot rewind causes retries to fail explicitly.
+File-like inputs must provide a length or support seeking to the end and
+back to their current position. Computing this length may read a transformed
+stream, such as a compressed file, before the upload starts.
 Reading the encoder without a size, or calling ``encode_multipart_formdata()``,
 still returns the complete body in memory.
 

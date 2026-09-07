@@ -27,7 +27,8 @@ class BodyPart:
     """
 
     def __init__(self, content: bytes) -> None:
-        if content.startswith(b"\r\n"):
+        # RFC 2046 permits parts with neither headers nor a body.
+        if not content or content.startswith(b"\r\n"):
             headerbytes, bodybytes = b"", content[2:]
         else:
             headerbytes, separator, bodybytes = content.partition(b"\r\n\r\n")
